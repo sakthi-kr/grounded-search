@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "groundedsearch-ml"
+version = "0.1.0"
+description = "Machine-learning service for GroundedSearch"
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Sakthi Ravichandran" }
+]
+dependencies = [
+  "fastapi==0.139.0",
+  "uvicorn==0.50.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx==0.28.1",
+  "mypy==2.3.0",
+  "pytest>=9.0,<10",
+  "pytest-cov==7.1.0",
+  "ruff==0.16.0"
+]
+
+[project.scripts]
+groundedsearch-ml = "groundedsearch_ml.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov=groundedsearch_ml",
+  "--cov-report=term-missing",
+  "--cov-fail-under=90"
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["groundedsearch_ml"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "RUF", "S"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S104"]
+"src/groundedsearch_ml/config.py" = ["S104"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+pretty = true
+show_error_codes = true
+warn_unused_configs = true
+mypy_path = "src"
+packages = ["groundedsearch_ml"]
