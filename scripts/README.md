@@ -1,19 +1,19 @@
-# Development Commands
+# Development Scripts
 
-The primary cross-platform project command is implemented in Go:
+This directory contains cross-platform project automation that is not tied to a
+single application service.
 
-```bash
-go run ./tools/projectctl help
-```
-
-The most useful command is:
+## Contract validation
 
 ```bash
-go run ./tools/projectctl verify-core
+python scripts/validate_contracts.py
 ```
 
-It validates contracts, runs Go and Python tests, builds the Go API, and executes
-the real service integration suite.
+## Docker Compose verification
 
-`validate_contracts.py` remains the contract-specific validator and is invoked by
-`projectctl`.
+```bash
+python scripts/verify_compose.py
+```
+
+The Compose verifier builds both Phase 1 images, tests healthy communication,
+tests degraded operation, and removes the temporary Compose environment.
