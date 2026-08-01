@@ -43,9 +43,23 @@ operations.
 
 ## Current status
 
-Phase 0: requirements, scope, architecture, threat model, and evaluation plan.
+Phase 1 is complete.
 
-No application functionality has been implemented yet.
+Implemented:
+
+- Go search API with health, readiness, request IDs, structured errors, timeouts,
+  JSON logging, and graceful shutdown;
+- Python ML service with health, readiness, and versioned model-information
+  responses;
+- versioned public and internal OpenAPI contracts;
+- Go-to-Python service communication with healthy and degraded states;
+- unit, contract, integration, and Docker Compose smoke tests;
+- non-root Docker images for both services;
+- cross-platform project verification commands;
+- GitHub Actions validation for Go, Python, contracts, and Docker Compose.
+
+Search indexing, access-control enforcement, embeddings, reranking, and grounded
+answer generation are not implemented yet.
 
 ## Documentation
 

@@ -1,0 +1,156 @@
+openapi: 3.1.0
+info:
+  title: GroundedSearch ML Service Internal API
+  version: 1.0.0
+  description: >
+    Versioned contract used by the Go search API to inspect the Python ML
+    service during the Phase 1 foundation.
+servers:
+  - url: http://ml-service:8090
+paths:
+  /healthz:
+    get:
+      operationId: getMLServiceHealth
+      tags: [system]
+      responses:
+        "200":
+          description: The ML service process is healthy.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /readyz:
+    get:
+      operationId: getMLServiceReadiness
+      tags: [system]
+      responses:
+        "200":
+          description: The ML service is ready to accept Phase 1 requests.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+  /v1/model/info:
+    get:
+      operationId: getModelInfo
+      tags: [models]
+      responses:
+        "200":
+          description: Foundation model and runtime metadata.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelInfoResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+components:
+  headers:
+    RequestID:
+      description: Correlation identifier for the request.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  responses:
+    InternalError:
+      description: The ML service could not process the request.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [service, status, version]
+      properties:
+        service:
+          type: string
+          const: ml-service
+        status:
+          type: string
+          const: healthy
+        version:
+          type: string
+          minLength: 1
+    ReadinessResponse:
+      type: object
+      additionalProperties: false
+      required: [service, status, version]
+      properties:
+        service:
+          type: string
+          const: ml-service
+        status:
+          type: string
+          const: ready
+        version:
+          type: string
+          minLength: 1
+    ModelInfoResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - service
+        - version
+        - status
+        - mode
+        - embedding_model
+        - reranker_model
+        - python_version
+        - environment
+      properties:
+        service:
+          type: string
+          const: ml-service
+        version:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          const: ready
+        mode:
+          type: string
+          const: foundation
+        embedding_model:
+          type: [string, "null"]
+        reranker_model:
+          type: [string, "null"]
+        python_version:
+          type: string
+          minLength: 1
+        environment:
+          type: string
+          minLength: 1
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        message:
+          type: string
+          minLength: 1
+        request_id:
+          type: [string, "null"]
