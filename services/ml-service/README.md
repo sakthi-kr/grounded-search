@@ -13,7 +13,8 @@ Implemented endpoints:
 | `GET` | `/v1/model/info` | Deterministic service and model metadata |
 
 No embedding or reranking model is loaded during Phase 1. Both model fields are
-returned as `null`, and the mode is reported as `foundation`.
+returned as `null`, and the mode is reported as `foundation`. The response
+also includes the ML service version for strict Go-client validation.
 
 ## Requirements
 
@@ -69,6 +70,7 @@ python -m ruff format --check .
 python -m ruff check .
 python -m mypy src
 python -m pytest
+python ../../scripts/validate_contracts.py
 ```
 
 The test configuration enforces a minimum total coverage of 90 percent.

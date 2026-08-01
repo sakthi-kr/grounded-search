@@ -13,6 +13,7 @@ import (
 
 	"github.com/sakthi-kr/grounded-search/apps/search-api/internal/config"
 	"github.com/sakthi-kr/grounded-search/apps/search-api/internal/httpapi"
+	"github.com/sakthi-kr/grounded-search/apps/search-api/internal/mlclient"
 	"github.com/sakthi-kr/grounded-search/apps/search-api/internal/server"
 )
 
@@ -30,7 +31,21 @@ func main() {
 		&slog.HandlerOptions{Level: cfg.LogLevel},
 	))
 
-	handler := httpapi.NewHandler(logger, version, time.Now().UTC())
+	modelInfoClient, err := mlclient.New(
+		cfg.MLServiceURL,
+		cfg.MLServiceTimeout,
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ML client configuration error: %v\n", err)
+		os.Exit(1)
+	}
+
+	handler := httpapi.NewHandler(
+		logger,
+		version,
+		time.Now().UTC(),
+		modelInfoClient,
+	)
 	httpServer := server.New(cfg, handler)
 
 	ctx, stop := signal.NotifyContext(
@@ -44,6 +59,7 @@ func main() {
 		"search API starting",
 		"address", httpServer.Address(),
 		"version", version,
+		"ml_service_url", cfg.MLServiceURL,
 	)
 
 	if err := run(ctx, logger, httpServer, cfg.ShutdownTimeout); err != nil {

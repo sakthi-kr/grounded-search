@@ -1,0 +1,150 @@
+openapi: 3.1.0
+info:
+  title: GroundedSearch Public API
+  version: 1.0.0
+  description: >
+    Phase 1 public contract for health, readiness, and combined system status.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      operationId: getSearchAPIHealth
+      tags: [system]
+      responses:
+        "200":
+          description: The search API process is healthy.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /readyz:
+    get:
+      operationId: getSearchAPIReadiness
+      tags: [system]
+      responses:
+        "200":
+          description: The search API can accept Phase 1 requests.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+  /v1/system/status:
+    get:
+      operationId: getSystemStatus
+      tags: [system]
+      responses:
+        "200":
+          description: Combined search API and ML service foundation status.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStatusResponse"
+components:
+  headers:
+    RequestID:
+      description: Correlation identifier for the request.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [service, status, version]
+      properties:
+        service:
+          type: string
+          const: search-api
+        status:
+          type: string
+          const: healthy
+        version:
+          type: string
+          minLength: 1
+    ReadinessResponse:
+      type: object
+      additionalProperties: false
+      required: [service, status, version]
+      properties:
+        service:
+          type: string
+          const: search-api
+        status:
+          type: string
+          const: ready
+        version:
+          type: string
+          minLength: 1
+    SystemStatusResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - service
+        - status
+        - version
+        - uptime_seconds
+        - dependencies
+      properties:
+        service:
+          type: string
+          const: search-api
+        status:
+          type: string
+          enum: [healthy, degraded]
+        version:
+          type: string
+          minLength: 1
+        uptime_seconds:
+          type: integer
+          minimum: 0
+        dependencies:
+          type: object
+          additionalProperties: false
+          required: [ml_service]
+          properties:
+            ml_service:
+              $ref: "#/components/schemas/MLServiceStatus"
+    MLServiceStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - version
+        - mode
+        - embedding_model
+        - reranker_model
+        - python_version
+        - environment
+      properties:
+        status:
+          type: string
+          enum: [ready, timeout, unavailable, invalid_response]
+        version:
+          type: [string, "null"]
+        mode:
+          type: [string, "null"]
+        embedding_model:
+          type: [string, "null"]
+        reranker_model:
+          type: [string, "null"]
+        python_version:
+          type: [string, "null"]
+        environment:
+          type: [string, "null"]
+        error:
+          type: string
+          enum:
+            - dependency_timeout
+            - dependency_unavailable
+            - invalid_dependency_response

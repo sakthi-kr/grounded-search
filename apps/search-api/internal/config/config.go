@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -18,6 +19,8 @@ const (
 	defaultWriteTimeout      = 15 * time.Second
 	defaultIdleTimeout       = 60 * time.Second
 	defaultShutdownTimeout   = 10 * time.Second
+	defaultMLServiceURL      = "http://localhost:8090"
+	defaultMLServiceTimeout  = 2 * time.Second
 	defaultLogLevel          = slog.LevelInfo
 )
 
@@ -30,6 +33,8 @@ type Config struct {
 	WriteTimeout      time.Duration
 	IdleTimeout       time.Duration
 	ShutdownTimeout   time.Duration
+	MLServiceURL      string
+	MLServiceTimeout  time.Duration
 	LogLevel          slog.Level
 }
 
@@ -106,6 +111,24 @@ func LoadFromLookup(lookup LookupEnv) (Config, error) {
 		return Config{}, err
 	}
 
+	mlServiceURL, err := urlValue(
+		lookup,
+		"ML_SERVICE_URL",
+		defaultMLServiceURL,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+
+	mlServiceTimeout, err := durationValue(
+		lookup,
+		"ML_SERVICE_TIMEOUT",
+		defaultMLServiceTimeout,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+
 	logLevel, err := logLevelValue(
 		lookup,
 		"LOG_LEVEL",
@@ -123,6 +146,8 @@ func LoadFromLookup(lookup LookupEnv) (Config, error) {
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
 		ShutdownTimeout:   shutdownTimeout,
+		MLServiceURL:      mlServiceURL,
+		MLServiceTimeout:  mlServiceTimeout,
 		LogLevel:          logLevel,
 	}, nil
 }
@@ -203,6 +228,41 @@ func durationValue(
 	}
 
 	return value, nil
+}
+
+func urlValue(
+	lookup LookupEnv,
+	key string,
+	fallback string,
+) (string, error) {
+	raw := stringValue(lookup, key, fallback)
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("%s must be a valid URL: %w", key, err)
+	}
+
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf(
+			"%s scheme must be http or https",
+			key,
+		)
+	}
+	if parsed.Host == "" {
+		return "", fmt.Errorf("%s must include a host", key)
+	}
+	if parsed.User != nil {
+		return "", fmt.Errorf("%s must not include credentials", key)
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf(
+			"%s must not include a query or fragment",
+			key,
+		)
+	}
+
+	parsed.Path = strings.TrimRight(parsed.Path, "/")
+
+	return parsed.String(), nil
 }
 
 func logLevelValue(

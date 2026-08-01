@@ -63,6 +63,7 @@ def test_model_info(client: TestClient) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["service"] == "ml-service"
+    assert payload["version"] == __version__
     assert payload["status"] == "ready"
     assert payload["mode"] == "foundation"
     assert payload["embedding_model"] is None

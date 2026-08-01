@@ -23,6 +23,7 @@ class ModelInfoResponse(StrictResponseModel):
     """Current model and service metadata."""
 
     service: Literal["ml-service"] = "ml-service"
+    version: str
     status: Literal["ready"] = "ready"
     mode: Literal["foundation"] = "foundation"
     embedding_model: str | None = None

@@ -134,6 +134,7 @@ def create_app(
         )
 
         return ModelInfoResponse(
+            version=__version__,
             python_version=platform.python_version(),
             environment=current_settings.environment,
         )

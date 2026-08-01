@@ -55,6 +55,20 @@ func TestLoadFromLookupUsesDefaults(t *testing.T) {
 			defaultShutdownTimeout,
 		)
 	}
+	if config.MLServiceURL != defaultMLServiceURL {
+		t.Errorf(
+			"MLServiceURL = %q, want %q",
+			config.MLServiceURL,
+			defaultMLServiceURL,
+		)
+	}
+	if config.MLServiceTimeout != defaultMLServiceTimeout {
+		t.Errorf(
+			"MLServiceTimeout = %v, want %v",
+			config.MLServiceTimeout,
+			defaultMLServiceTimeout,
+		)
+	}
 	if config.LogLevel != defaultLogLevel {
 		t.Errorf(
 			"LogLevel = %v, want %v",
@@ -75,6 +89,8 @@ func TestLoadFromLookupUsesOverrides(t *testing.T) {
 		"SEARCH_API_WRITE_TIMEOUT":       "4s",
 		"SEARCH_API_IDLE_TIMEOUT":        "5s",
 		"SEARCH_API_SHUTDOWN_TIMEOUT":    "6s",
+		"ML_SERVICE_URL":                 "http://127.0.0.1:9091/api/",
+		"ML_SERVICE_TIMEOUT":             "750ms",
 		"LOG_LEVEL":                      "DEBUG",
 	}
 
@@ -108,6 +124,18 @@ func TestLoadFromLookupUsesOverrides(t *testing.T) {
 		t.Errorf(
 			"ShutdownTimeout = %v, want 6s",
 			config.ShutdownTimeout,
+		)
+	}
+	if config.MLServiceURL != "http://127.0.0.1:9091/api" {
+		t.Errorf(
+			"MLServiceURL = %q, want http://127.0.0.1:9091/api",
+			config.MLServiceURL,
+		)
+	}
+	if config.MLServiceTimeout != 750*time.Millisecond {
+		t.Errorf(
+			"MLServiceTimeout = %v, want 750ms",
+			config.MLServiceTimeout,
 		)
 	}
 	if config.LogLevel != slog.LevelDebug {
@@ -166,6 +194,36 @@ func TestLoadFromLookupRejectsInvalidValues(t *testing.T) {
 			name: "non-positive duration",
 			values: map[string]string{
 				"SEARCH_API_IDLE_TIMEOUT": "0s",
+			},
+		},
+		{
+			name: "invalid ML URL scheme",
+			values: map[string]string{
+				"ML_SERVICE_URL": "ftp://localhost:8090",
+			},
+		},
+		{
+			name: "ML URL without host",
+			values: map[string]string{
+				"ML_SERVICE_URL": "http:///missing-host",
+			},
+		},
+		{
+			name: "ML URL with credentials",
+			values: map[string]string{
+				"ML_SERVICE_URL": "http://user:pass@localhost:8090",
+			},
+		},
+		{
+			name: "ML URL with query",
+			values: map[string]string{
+				"ML_SERVICE_URL": "http://localhost:8090?debug=true",
+			},
+		},
+		{
+			name: "invalid ML timeout",
+			values: map[string]string{
+				"ML_SERVICE_TIMEOUT": "0s",
 			},
 		},
 		{

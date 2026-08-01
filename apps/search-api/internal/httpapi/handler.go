@@ -1,17 +1,22 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/sakthi-kr/grounded-search/apps/search-api/internal/mlclient"
 )
 
 const (
@@ -23,11 +28,19 @@ type contextKey string
 
 const requestIDContextKey contextKey = "request-id"
 
+type modelInfoProvider interface {
+	ModelInfo(
+		context.Context,
+		string,
+	) (mlclient.ModelInfo, error)
+}
+
 // Handler owns the Phase 1 HTTP routes and middleware.
 type Handler struct {
-	logger    *slog.Logger
-	version   string
-	startedAt time.Time
+	logger          *slog.Logger
+	version         string
+	startedAt       time.Time
+	modelInfoClient modelInfoProvider
 }
 
 // NewHandler returns the complete Phase 1 HTTP handler.
@@ -35,6 +48,7 @@ func NewHandler(
 	logger *slog.Logger,
 	version string,
 	startedAt time.Time,
+	modelInfoClient modelInfoProvider,
 ) http.Handler {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -45,9 +59,10 @@ func NewHandler(
 	}
 
 	handler := &Handler{
-		logger:    logger,
-		version:   version,
-		startedAt: startedAt.UTC(),
+		logger:          logger,
+		version:         version,
+		startedAt:       startedAt.UTC(),
+		modelInfoClient: modelInfoClient,
 	}
 
 	mux := http.NewServeMux()
@@ -113,15 +128,90 @@ func (handler *Handler) systemStatus(
 		uptime = 0
 	}
 
+	dependency := handler.mlServiceStatus(request)
+	status := "healthy"
+	if dependency.Status != "ready" {
+		status = "degraded"
+	}
+
 	writeJSON(writer, http.StatusOK, systemStatusResponse{
 		Service:       serviceName,
-		Status:        "foundation",
+		Status:        status,
 		Version:       handler.version,
 		UptimeSeconds: int64(uptime / time.Second),
-		Dependencies: map[string]string{
-			"ml_service": "not_configured",
+		Dependencies: dependenciesResponse{
+			MLService: dependency,
 		},
 	})
+}
+
+func (handler *Handler) mlServiceStatus(
+	request *http.Request,
+) mlServiceStatusResponse {
+	if handler.modelInfoClient == nil {
+		return unavailableMLServiceStatus(
+			"dependency_unavailable",
+			"unavailable",
+		)
+	}
+
+	info, err := handler.modelInfoClient.ModelInfo(
+		request.Context(),
+		requestIDFromRequest(request),
+	)
+	if err != nil {
+		status, code := classifyDependencyError(err)
+
+		handler.logger.Warn(
+			"ML service status check failed",
+			"request_id", requestIDFromRequest(request),
+			"dependency_status", status,
+			"error", err,
+		)
+
+		return unavailableMLServiceStatus(code, status)
+	}
+
+	return mlServiceStatusResponse{
+		Status:         "ready",
+		Version:        stringPointer(info.Version),
+		Mode:           stringPointer(info.Mode),
+		EmbeddingModel: info.EmbeddingModel,
+		RerankerModel:  info.RerankerModel,
+		PythonVersion:  stringPointer(info.PythonVersion),
+		Environment:    stringPointer(info.Environment),
+	}
+}
+
+func classifyDependencyError(err error) (status string, code string) {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout", "dependency_timeout"
+	}
+
+	var networkError net.Error
+	if errors.As(err, &networkError) && networkError.Timeout() {
+		return "timeout", "dependency_timeout"
+	}
+
+	if errors.Is(err, mlclient.ErrInvalidResponse) {
+		return "invalid_response", "invalid_dependency_response"
+	}
+
+	return "unavailable", "dependency_unavailable"
+}
+
+func unavailableMLServiceStatus(
+	code string,
+	status string,
+) mlServiceStatusResponse {
+	return mlServiceStatusResponse{
+		Status: status,
+		Error:  code,
+	}
+}
+
+func stringPointer(value string) *string {
+	return &value
 }
 
 func (handler *Handler) notFound(
@@ -144,11 +234,26 @@ type healthResponse struct {
 }
 
 type systemStatusResponse struct {
-	Service       string            `json:"service"`
-	Status        string            `json:"status"`
-	Version       string            `json:"version"`
-	UptimeSeconds int64             `json:"uptime_seconds"`
-	Dependencies  map[string]string `json:"dependencies"`
+	Service       string               `json:"service"`
+	Status        string               `json:"status"`
+	Version       string               `json:"version"`
+	UptimeSeconds int64                `json:"uptime_seconds"`
+	Dependencies  dependenciesResponse `json:"dependencies"`
+}
+
+type dependenciesResponse struct {
+	MLService mlServiceStatusResponse `json:"ml_service"`
+}
+
+type mlServiceStatusResponse struct {
+	Status         string  `json:"status"`
+	Version        *string `json:"version"`
+	Mode           *string `json:"mode"`
+	EmbeddingModel *string `json:"embedding_model"`
+	RerankerModel  *string `json:"reranker_model"`
+	PythonVersion  *string `json:"python_version"`
+	Environment    *string `json:"environment"`
+	Error          string  `json:"error,omitempty"`
 }
 
 type apiErrorBody struct {
@@ -190,8 +295,6 @@ func writeJSON(
 	encoder.SetEscapeHTML(true)
 
 	if err := encoder.Encode(payload); err != nil {
-		// The response headers may already be committed. Logging is handled by
-		// the surrounding request middleware.
 		return
 	}
 }
