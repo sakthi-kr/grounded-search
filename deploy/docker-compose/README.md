@@ -1,26 +1,31 @@
 # Docker Compose Deployment
 
-The Phase 1 Compose environment runs the Go search API and Python ML service as
-separate containers.
+The local Compose environment runs:
 
-## Build and verify
+- PostgreSQL 18.4 as the authoritative metadata store;
+- the Go search API;
+- the Python ML service.
+
+PostgreSQL is available only on the internal Compose network. It is not
+published to a host port by default.
+
+## Validate migrations
 
 From the repository root:
 
 ```bash
-python scripts/verify_compose.py
+python scripts/validate_migrations.py
 ```
 
-The script:
+The validator starts a temporary PostgreSQL container, applies all upward
+migrations, verifies the expected tables and constraints, applies all downward
+migrations in reverse order, verifies cleanup, and removes the container.
 
-1. validates the Compose file;
-2. builds both images;
-3. starts the services;
-4. waits for both health checks;
-5. confirms the Go API reports the ML service as healthy;
-6. stops the ML container;
-7. confirms the Go API remains available in degraded mode;
-8. removes containers, networks, and temporary resources.
+## Build and verify the Phase 1 services
+
+```bash
+python scripts/verify_compose.py
+```
 
 ## Start manually
 
@@ -38,15 +43,8 @@ ML service: http://localhost:8090
 Stop the environment:
 
 ```bash
-docker compose -f deploy/docker-compose/compose.yaml down --remove-orphans
+docker compose   -f deploy/docker-compose/compose.yaml   down --volumes --remove-orphans
 ```
 
-## Port overrides
-
-Use environment variables when the default host ports are occupied:
-
-```bash
-SEARCH_API_HOST_PORT=18080 ML_SERVICE_HOST_PORT=18090 docker compose -f deploy/docker-compose/compose.yaml up --build
-```
-
-Container-to-container communication continues to use ports `8080` and `8090`.
+The `--volumes` option deletes local PostgreSQL data. Omit it when you want the
+database contents to persist between runs.

@@ -1,0 +1,7 @@
+BEGIN;
+
+DROP TABLE IF EXISTS group_memberships;
+DROP TABLE IF EXISTS groups;
+DROP TABLE IF EXISTS users;
+
+COMMIT;
