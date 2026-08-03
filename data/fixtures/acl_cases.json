@@ -1,0 +1,128 @@
+[
+  {
+    "name": "public document",
+    "user_id": "alice",
+    "user": {
+      "exists": true,
+      "enabled": true,
+      "groups": []
+    },
+    "document": {
+      "status": "active",
+      "public": true,
+      "user_rules": {},
+      "group_rules": {}
+    },
+    "expected": {
+      "allowed": true,
+      "reason": "public_document"
+    }
+  },
+  {
+    "name": "user deny overrides public",
+    "user_id": "alice",
+    "user": {
+      "exists": true,
+      "enabled": true,
+      "groups": []
+    },
+    "document": {
+      "status": "active",
+      "public": true,
+      "user_rules": {
+        "alice": "deny"
+      },
+      "group_rules": {}
+    },
+    "expected": {
+      "allowed": false,
+      "reason": "explicit_user_deny"
+    }
+  },
+  {
+    "name": "group deny overrides user allow",
+    "user_id": "alice",
+    "user": {
+      "exists": true,
+      "enabled": true,
+      "groups": [
+        "engineering"
+      ]
+    },
+    "document": {
+      "status": "active",
+      "public": false,
+      "user_rules": {
+        "alice": "allow"
+      },
+      "group_rules": {
+        "engineering": "deny"
+      }
+    },
+    "expected": {
+      "allowed": false,
+      "reason": "matching_group_deny"
+    }
+  },
+  {
+    "name": "group allow",
+    "user_id": "alice",
+    "user": {
+      "exists": true,
+      "enabled": true,
+      "groups": [
+        "engineering"
+      ]
+    },
+    "document": {
+      "status": "active",
+      "public": false,
+      "user_rules": {},
+      "group_rules": {
+        "engineering": "allow"
+      }
+    },
+    "expected": {
+      "allowed": true,
+      "reason": "matching_group_allow"
+    }
+  },
+  {
+    "name": "disabled user",
+    "user_id": "alice",
+    "user": {
+      "exists": true,
+      "enabled": false,
+      "groups": []
+    },
+    "document": {
+      "status": "active",
+      "public": true,
+      "user_rules": {},
+      "group_rules": {}
+    },
+    "expected": {
+      "allowed": false,
+      "reason": "user_disabled"
+    }
+  },
+  {
+    "name": "deleted document",
+    "user_id": "alice",
+    "user": {
+      "exists": true,
+      "enabled": true,
+      "groups": []
+    },
+    "document": {
+      "status": "deleted",
+      "public": true,
+      "user_rules": {},
+      "group_rules": {}
+    },
+    "expected": {
+      "allowed": false,
+      "reason": "document_deleted"
+    }
+  }
+]
