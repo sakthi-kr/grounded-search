@@ -21,6 +21,10 @@ const (
 	defaultShutdownTimeout   = 10 * time.Second
 	defaultMLServiceURL      = "http://localhost:8090"
 	defaultMLServiceTimeout  = 2 * time.Second
+	defaultDatabaseURL       = "postgres://groundedsearch:groundedsearch_dev@localhost:5432/groundedsearch?sslmode=disable"
+	defaultDatabaseTimeout   = 5 * time.Second
+	defaultDatabaseMaxConns  = 10
+	defaultDatabaseMinConns  = 1
 	defaultLogLevel          = slog.LevelInfo
 )
 
@@ -35,6 +39,10 @@ type Config struct {
 	ShutdownTimeout   time.Duration
 	MLServiceURL      string
 	MLServiceTimeout  time.Duration
+	DatabaseURL       string
+	DatabaseTimeout   time.Duration
+	DatabaseMaxConns  int
+	DatabaseMinConns  int
 	LogLevel          slog.Level
 }
 
@@ -129,6 +137,46 @@ func LoadFromLookup(lookup LookupEnv) (Config, error) {
 		return Config{}, err
 	}
 
+	databaseURL, err := databaseURLValue(
+		lookup,
+		"DATABASE_URL",
+		defaultDatabaseURL,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+
+	databaseTimeout, err := durationValue(
+		lookup,
+		"DATABASE_CONNECT_TIMEOUT",
+		defaultDatabaseTimeout,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+
+	databaseMaxConns, err := intValue(
+		lookup,
+		"DATABASE_MAX_CONNS",
+		defaultDatabaseMaxConns,
+		1,
+		100,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+
+	databaseMinConns, err := intValue(
+		lookup,
+		"DATABASE_MIN_CONNS",
+		defaultDatabaseMinConns,
+		0,
+		databaseMaxConns,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+
 	logLevel, err := logLevelValue(
 		lookup,
 		"LOG_LEVEL",
@@ -148,6 +196,10 @@ func LoadFromLookup(lookup LookupEnv) (Config, error) {
 		ShutdownTimeout:   shutdownTimeout,
 		MLServiceURL:      mlServiceURL,
 		MLServiceTimeout:  mlServiceTimeout,
+		DatabaseURL:       databaseURL,
+		DatabaseTimeout:   databaseTimeout,
+		DatabaseMaxConns:  databaseMaxConns,
+		DatabaseMinConns:  databaseMinConns,
 		LogLevel:          logLevel,
 	}, nil
 }
@@ -262,6 +314,34 @@ func urlValue(
 
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 
+	return parsed.String(), nil
+}
+
+func databaseURLValue(
+	lookup LookupEnv,
+	key string,
+	fallback string,
+) (string, error) {
+	raw := stringValue(lookup, key, fallback)
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("%s must be a valid PostgreSQL URL: %w", key, err)
+	}
+	if parsed.Scheme != "postgres" && parsed.Scheme != "postgresql" {
+		return "", fmt.Errorf("%s scheme must be postgres or postgresql", key)
+	}
+	if parsed.Host == "" {
+		return "", fmt.Errorf("%s must include a host", key)
+	}
+	if parsed.User == nil || parsed.User.Username() == "" {
+		return "", fmt.Errorf("%s must include a username", key)
+	}
+	if strings.Trim(parsed.Path, "/") == "" {
+		return "", fmt.Errorf("%s must include a database name", key)
+	}
+	if parsed.Fragment != "" {
+		return "", fmt.Errorf("%s must not include a fragment", key)
+	}
 	return parsed.String(), nil
 }
 
