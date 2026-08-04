@@ -43,7 +43,7 @@ operations.
 
 ## Current status
 
-Phase 1 is complete.
+The service foundation is implemented and validated.
 
 Implemented:
 
